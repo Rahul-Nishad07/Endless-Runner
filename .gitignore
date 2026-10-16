@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Local environment values (client IDs, AdMob unit IDs). Never commit.
+.env
