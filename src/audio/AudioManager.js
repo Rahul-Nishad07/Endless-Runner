@@ -1,25 +1,9 @@
-// ============================================
-// AUDIO MANAGER
-//
-// One place for all game audio. Built on expo-audio, which is already
-// a project dependency. Asset paths are fixed here, so replacing a file
-// under assets/audio/ with final audio needs no code change.
-//
-// Design notes:
-// - Every sound is loaded once. Each sound has a small pool of players,
-//   so a second play can start while the first is still sounding.
-// - Playback is event-driven. Game code calls playSfx() on a successful
-//   action only. Nothing here runs in the render loop.
-// - Every call is safe to make before initialize() finishes, and after
-//   dispose(). Failures are logged and ignored, so audio never blocks
-//   movement, collision, scoring or restart.
-// ============================================
 
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // ============================================
-// ASSETS (temporary placeholders, see assets/audio/README.md)
+// AUDIO ASSETS
 // ============================================
 
 const MUSIC_SOURCE = require('../../assets/audio/music/runner_theme.wav');
@@ -47,17 +31,11 @@ const DEFAULT_SETTINGS = {
   sfxVolume: 0.8,
 };
 
-// Players per sound. Coin trails fire quickly, so coin gets more.
 const VOICES_PER_SFX = 2;
 const VOICES = { coin: 3 };
 
-// Minimum gap between two coin sounds. Long trails then sound like a
-// steady chime, not a harsh stack.
 const COIN_MIN_INTERVAL_MS = 60;
-
-// Quiet time before settings are written. Slider drags write once at the end.
 const SAVE_DEBOUNCE_MS = 400;
-
 const MUSIC_FADE_MS = 600;
 const FADE_STEP_MS = 40;
 
@@ -69,40 +47,53 @@ function clamp01(value) {
   return Math.min(1, Math.max(0, value));
 }
 
+// ============================================
+// AUDIO MANAGER
+// ============================================
+
 class AudioManager {
   constructor() {
     this.settings = { ...DEFAULT_SETTINGS };
 
     this.initPromise = null;
     this.ready = false;
+    this.disposed = false;
 
     this.music = null;
-    this.musicWanted = false;   // Gameplay wants music playing.
+    this.musicWanted = false;
     this.musicPlaying = false;
-    this.musicLevel = 0;        // Current fade level, 0..1.
+    this.musicLevel = 0;
 
-    this.sfxPools = new Map();  // name -> { players, next }
+    this.sfxPools = new Map();
     this.lastCoinAt = 0;
 
     this.paused = false;
     this.fadeTimer = null;
-
     this.saveTimer = null;
+
     this.listeners = new Set();
   }
 
   // ==========================================
-  // SETUP
+  // INITIALIZATION
   // ==========================================
 
-  /**
-   * Loads settings and creates players. Safe to call more than once.
-   * Does not block: callers should not await it during game start.
-   */
   initialize() {
+    if (this.ready) {
+      return Promise.resolve();
+    }
+
     if (!this.initPromise) {
+      this.disposed = false;
+
       this.initPromise = this.setup().catch((error) => {
-        console.warn('[AUDIO] Initialisation failed:', error?.message || error);
+        this.ready = false;
+        this.initPromise = null;
+
+        console.warn(
+          '[AUDIO] Initialization failed:',
+          error?.message || error
+        );
       });
     }
 
@@ -113,33 +104,52 @@ class AudioManager {
     try {
       await setAudioModeAsync({
         playsInSilentMode: true,
-        // Mix with other audio. The game's own sounds are short.
         interruptionMode: 'mixWithOthers',
         shouldPlayInBackground: false,
       });
     } catch (error) {
-      console.warn('[AUDIO] Audio mode not set:', error?.message || error);
+      console.warn(
+        '[AUDIO] Audio mode could not be configured:',
+        error?.message || error
+      );
     }
 
     await this.loadSettings();
-    this.notify();
+
+    if (this.disposed) return;
 
     this.createPlayers();
 
+    if (this.disposed) {
+      this.releasePlayers();
+      return;
+    }
+
     this.ready = true;
-    console.log('[AUDIO] Ready');
+    this.notify();
+
+    console.log('[AUDIO] Audio manager ready');
+    console.log('[AUDIO] SFX enabled:', this.settings.sfxEnabled);
+    console.log('[AUDIO] Music enabled:', this.settings.musicEnabled);
   }
 
   createPlayers() {
+    this.releasePlayers();
+
     try {
       this.music = createAudioPlayer(MUSIC_SOURCE, {
         keepAudioSessionActive: true,
       });
+
       this.music.loop = true;
       this.music.volume = 0;
     } catch (error) {
-      console.warn('[AUDIO] Music not loaded:', error?.message || error);
       this.music = null;
+
+      console.warn(
+        '[AUDIO] Music player creation failed:',
+        error?.message || error
+      );
     }
 
     for (const [name, source] of Object.entries(SFX_SOURCES)) {
@@ -150,17 +160,26 @@ class AudioManager {
         try {
           players.push(createAudioPlayer(source));
         } catch (error) {
-          console.warn(`[AUDIO] SFX ${name} not loaded:`, error?.message || error);
-          break;
+          console.warn(
+            `[AUDIO] Could not create ${name} player:`,
+            error?.message || error
+          );
         }
       }
 
-      this.sfxPools.set(name, { players, next: 0 });
+      this.sfxPools.set(name, {
+        players,
+        next: 0,
+      });
+
+      if (players.length === 0) {
+        console.warn(`[AUDIO] No players created for ${name}`);
+      }
     }
   }
 
   // ==========================================
-  // SETTINGS (persisted to the app's document folder)
+  // SETTINGS
   // ==========================================
 
   async loadSettings() {
@@ -171,19 +190,26 @@ class AudioManager {
       this.settings = {
         ...DEFAULT_SETTINGS,
         ...saved,
-        musicVolume: clamp01(saved.musicVolume ?? DEFAULT_SETTINGS.musicVolume),
-        sfxVolume: clamp01(saved.sfxVolume ?? DEFAULT_SETTINGS.sfxVolume),
+        musicEnabled:
+          typeof saved.musicEnabled === 'boolean'
+            ? saved.musicEnabled
+            : DEFAULT_SETTINGS.musicEnabled,
+        sfxEnabled:
+          typeof saved.sfxEnabled === 'boolean'
+            ? saved.sfxEnabled
+            : DEFAULT_SETTINGS.sfxEnabled,
+        musicVolume: clamp01(
+          saved.musicVolume ?? DEFAULT_SETTINGS.musicVolume
+        ),
+        sfxVolume: clamp01(
+          saved.sfxVolume ?? DEFAULT_SETTINGS.sfxVolume
+        ),
       };
     } catch {
-      // No saved file yet, or it cannot be read. Use the defaults.
       this.settings = { ...DEFAULT_SETTINGS };
     }
   }
 
-  /**
-   * Saves settings to disk, debounced. A slider drag changes the volume
-   * many times a second, so only the last value in each burst is written.
-   */
   saveSettings() {
     this.notify();
 
@@ -202,14 +228,19 @@ class AudioManager {
       SETTINGS_PATH(),
       JSON.stringify(this.settings)
     ).catch((error) => {
-      console.warn('[AUDIO] Settings not saved:', error?.message || error);
+      console.warn(
+        '[AUDIO] Settings save failed:',
+        error?.message || error
+      );
     });
   }
 
-  /** Calls listener() after every settings change or load. Returns unsubscribe. */
   subscribe(listener) {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   notify() {
@@ -217,7 +248,10 @@ class AudioManager {
       try {
         listener(this.getSettings());
       } catch (error) {
-        console.warn('[AUDIO] Settings listener failed:', error?.message || error);
+        console.warn(
+          '[AUDIO] Settings listener failed:',
+          error?.message || error
+        );
       }
     }
   }
@@ -230,24 +264,50 @@ class AudioManager {
   // MUSIC
   // ==========================================
 
-  /** Starts the loop with a fade-in. Does nothing if already playing. */
   playMusic() {
     this.musicWanted = true;
 
-    if (!this.music || !this.settings.musicEnabled || this.paused) return;
+    if (!this.ready) {
+      console.log('[AUDIO] Music requested before initialization');
+      return;
+    }
+
+    if (!this.music) {
+      console.warn('[AUDIO] Music player is unavailable');
+      return;
+    }
+
+    if (!this.settings.musicEnabled || this.paused || this.disposed) {
+      return;
+    }
+
     if (this.musicPlaying) return;
 
     try {
-      this.music.seekTo(0).catch(() => {});
-      this.music.play();
       this.musicPlaying = true;
+
+      const seekResult = this.music.seekTo(0);
+
+      if (seekResult?.catch) {
+        seekResult.catch((error) => {
+          console.warn('[AUDIO] Music seek failed:', error);
+        });
+      }
+
+      this.music.play();
       this.fadeMusic(this.settings.musicVolume, MUSIC_FADE_MS);
+
+      console.log('[AUDIO] Music playback requested');
     } catch (error) {
-      console.warn('[AUDIO] Music play failed:', error?.message || error);
+      this.musicPlaying = false;
+
+      console.warn(
+        '[AUDIO] Music playback failed:',
+        error?.message || error
+      );
     }
   }
 
-  /** Fades out and stops. Pass fade: false for an immediate stop. */
   stopMusic({ fade = true } = {}) {
     this.musicWanted = false;
 
@@ -256,9 +316,10 @@ class AudioManager {
     const finish = () => {
       try {
         this.music?.pause();
-      } catch {
-        // The player may already be released. Nothing else to do.
+      } catch (error) {
+        console.warn('[AUDIO] Music stop failed:', error);
       }
+
       this.musicPlaying = false;
     };
 
@@ -273,25 +334,35 @@ class AudioManager {
     this.fadeMusic(0, MUSIC_FADE_MS, finish);
   }
 
-  /** Stops immediately and starts again from the beginning. */
   restartMusic() {
     this.stopMusic({ fade: false });
     this.playMusic();
   }
 
-  // Fades the music level toward a target over durationMs.
   fadeMusic(target, durationMs, onDone) {
     this.cancelFade();
 
-    const steps = Math.max(1, Math.round(durationMs / FADE_STEP_MS));
+    const steps = Math.max(
+      1,
+      Math.round(durationMs / FADE_STEP_MS)
+    );
+
     const start = this.musicLevel;
     let step = 0;
 
     const tick = () => {
-      step += 1;
-      const t = step / steps;
+      if (this.disposed || !this.music) {
+        this.fadeTimer = null;
+        return;
+      }
 
-      this.musicLevel = start + (target - start) * t;
+      step += 1;
+
+      const progress = Math.min(1, step / steps);
+
+      this.musicLevel =
+        start + (target - start) * progress;
+
       this.applyMusicVolume();
 
       if (step >= steps) {
@@ -317,9 +388,11 @@ class AudioManager {
     if (!this.music) return;
 
     try {
-      this.music.volume = clamp01(this.musicLevel);
-    } catch {
-      // Player released. Ignore.
+      this.music.volume = clamp01(
+        this.musicLevel * this.settings.musicVolume
+      );
+    } catch (error) {
+      console.warn('[AUDIO] Music volume update failed:', error);
     }
   }
 
@@ -327,36 +400,72 @@ class AudioManager {
   // SOUND EFFECTS
   // ==========================================
 
-  /**
-   * Plays a named sound effect once. Unknown names and disabled sound
-   * are ignored. Coin sounds are throttled.
-   */
   playSfx(name) {
-    if (!this.settings.sfxEnabled || this.paused) return;
+    if (!this.settings.sfxEnabled) {
+      console.log(`[AUDIO] SFX disabled: ${name}`);
+      return;
+    }
+
+    if (this.paused) {
+      console.log(`[AUDIO] SFX skipped because audio is paused: ${name}`);
+      return;
+    }
+
+    if (this.disposed) {
+      console.log(`[AUDIO] SFX skipped because manager is disposed: ${name}`);
+      return;
+    }
+
+    if (!this.ready) {
+      console.log(`[AUDIO] SFX skipped because audio is not ready: ${name}`);
+      return;
+    }
 
     const pool = this.sfxPools.get(name);
-    if (!pool || pool.players.length === 0) return;
+
+    if (!pool || pool.players.length === 0) {
+      console.warn(`[AUDIO] No player available for SFX: ${name}`);
+      return;
+    }
 
     if (name === 'coin') {
       const now = Date.now();
-      if (now - this.lastCoinAt < COIN_MIN_INTERVAL_MS) return;
+
+      if (now - this.lastCoinAt < COIN_MIN_INTERVAL_MS) {
+        return;
+      }
+
       this.lastCoinAt = now;
     }
 
     const player = pool.players[pool.next];
+
     pool.next = (pool.next + 1) % pool.players.length;
 
     try {
       player.volume = this.settings.sfxVolume;
-      player.seekTo(0).catch(() => {});
+
+      const seekResult = player.seekTo(0);
+
+      if (seekResult?.catch) {
+        seekResult.catch((error) => {
+          console.warn(`[AUDIO] SFX seek failed (${name}):`, error);
+        });
+      }
+
       player.play();
+
+      console.log(`[AUDIO] Playing SFX: ${name}`);
     } catch (error) {
-      console.warn(`[AUDIO] SFX ${name} failed:`, error?.message || error);
+      console.warn(
+        `[AUDIO] SFX playback failed (${name}):`,
+        error?.message || error
+      );
     }
   }
 
   // ==========================================
-  // SETTINGS CONTROLS (take effect immediately)
+  // SETTINGS CONTROLS
   // ==========================================
 
   setMusicEnabled(enabled) {
@@ -365,7 +474,6 @@ class AudioManager {
 
     if (!enabled) {
       this.stopMusic({ fade: false });
-      this.musicWanted = false;
     } else if (this.musicWanted) {
       this.playMusic();
     }
@@ -381,7 +489,6 @@ class AudioManager {
     this.saveSettings();
 
     if (this.musicPlaying) {
-      this.musicLevel = this.settings.musicVolume;
       this.applyMusicVolume();
     }
   }
@@ -395,7 +502,6 @@ class AudioManager {
   // LIFECYCLE
   // ==========================================
 
-  /** App went to the background, or the game was paused. */
   pause() {
     this.paused = true;
 
@@ -404,45 +510,50 @@ class AudioManager {
 
       try {
         this.music.pause();
-      } catch {
-        // Ignore: the player may already be released.
+      } catch (error) {
+        console.warn('[AUDIO] Music pause failed:', error);
       }
     }
+
+    console.log('[AUDIO] Audio paused');
   }
 
-  /** App came back, or the game was resumed. */
   resume() {
     if (!this.paused) return;
 
     this.paused = false;
 
-    if (this.music && this.musicPlaying && this.settings.musicEnabled) {
+    if (
+      this.music &&
+      this.musicPlaying &&
+      this.settings.musicEnabled &&
+      !this.disposed
+    ) {
       try {
         this.music.play();
         this.fadeMusic(this.settings.musicVolume, FADE_STEP_MS * 3);
       } catch (error) {
-        console.warn('[AUDIO] Resume failed:', error?.message || error);
+        console.warn(
+          '[AUDIO] Music resume failed:',
+          error?.message || error
+        );
       }
     }
+
+    console.log('[AUDIO] Audio resumed');
   }
 
-  /** Releases every player. Call on unmount. */
-  dispose() {
-    this.cancelFade();
+  // ==========================================
+  // CLEANUP
+  // ==========================================
 
-    // Write any pending settings before releasing players.
-    if (this.saveTimer !== null) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = null;
-      this.writeSettingsNow();
-    }
-
+  releasePlayers() {
     const release = (player) => {
       try {
         player?.pause();
         player?.remove();
       } catch {
-        // Already released.
+        // The player may already be released.
       }
     };
 
@@ -452,7 +563,21 @@ class AudioManager {
     for (const pool of this.sfxPools.values()) {
       pool.players.forEach(release);
     }
+
     this.sfxPools.clear();
+  }
+
+  dispose() {
+    this.disposed = true;
+    this.cancelFade();
+
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+      this.writeSettingsNow();
+    }
+
+    this.releasePlayers();
 
     this.musicPlaying = false;
     this.musicWanted = false;
@@ -460,10 +585,12 @@ class AudioManager {
     this.paused = false;
     this.ready = false;
     this.initPromise = null;
+
+    console.log('[AUDIO] Audio manager disposed');
   }
 }
 
-// One shared instance for the whole app. Do not create another.
+// Use one shared instance throughout the app.
 const audioManager = new AudioManager();
 
 export default audioManager;

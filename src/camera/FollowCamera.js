@@ -3,38 +3,30 @@ import * as THREE from 'three';
 import CameraShake from './CameraShake';
 import CameraEffects from './CameraEffects';
 
+
 const CAMERA_CONFIG = {
-  height: 4.6,
-  distance: 6.5,
-  lookAhead: 20,
-  lookHeight: 1.1,
-  followSmoothness: 5.5,
+  height: 3.2,
+  distance: 5.5,
+  lookAhead: 12,
+  lookHeight: 0.9,
+  followSmoothness: 7.0,
   jumpCameraInfluence: 0.16,
   jumpLookInfluence: 0.3,
   landingInfluence: 0.7,
 
-  // How far the camera rises and looks up with the Sky Flyer's height.
   flyCameraInfluence: 1.0,
   flyLookInfluence: 0.8,
   flyPullBackInfluence: 0.9,
 };
 
-// Chase framing. Pulls the camera back and up, and looks a little less far
-// ahead, so the truck sits low and small behind the runner and the runner
-// stays in the middle of the screen. Values were chosen with a projection
-// check against the truck's real position (12 m behind the runner) and the
-// 65 degree field of view.
 const CHASE_VIEW = {
-  // Same height and look angle as normal mode. Only the distance changes,
-  // so the truck fits behind the runner.
   extraDistance: 6,
   heightOffset: 0,
-  lookAhead: 20,
-  lookHeight: 1.1,
-
-  // Blend speed (per second). About 0.6 s to reach 90% of the chase framing.
+  lookAhead: 12,
+  lookHeight: 0.9,
   blendRate: 3.8,
 };
+
 
 export default class FollowCamera {
   constructor(camera) {

@@ -6,29 +6,31 @@ export function createCamera(width, height) {
   const safeHeight = Math.max(height, 1);
 
   const camera = new THREE.PerspectiveCamera(
-    65,
+    60,
     safeWidth / safeHeight,
     0.1,
     500
   );
 
-  // Third-person runner camera.
-  // Player is at approximately z = 2.
+  // Third-person endless runner camera.
+  // Player is approximately at z = 2.
   camera.position.set(
     0,
-    4.6,
-    8.5
+    3.6,
+    7.0
   );
 
-  // Look down the road while keeping the player visible.
+  // Look forward along the track.
+  // This gives the road a stronger sense of depth.
   camera.lookAt(
     0,
-    1.1,
-    -18
+    0.9,
+    -14
   );
 
+  // Keep camera matrices updated.
   camera.updateProjectionMatrix();
-  camera.updateMatrixWorld();
+  camera.updateMatrixWorld(true);
 
   return camera;
 }

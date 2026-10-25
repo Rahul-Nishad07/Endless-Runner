@@ -425,7 +425,7 @@ function createJungle(group) {
       // Tops land at roughly 11, 17 and 23 units. Width is unchanged.
       addTree(
         group,
-        side * (8.6 + (i % 3) * 0.9),
+     side * (7.8 + (i % 3) * 0.6),
         z,
         1.4 + (i % 3) * 0.15,
         true,
@@ -435,15 +435,32 @@ function createJungle(group) {
       // Understory: ferns, saplings, roots and hanging vines. All sit
       // beside the road, outside the corridor, and use shared geometry.
       if (i % 2 === 0) {
-        addFernCluster(group, side * (6.9 + (i % 4) * 0.35), z - 1.2, i);
+        addFernCluster(
+  group,
+  side * (4.8 + (i % 4) * 0.15),
+  z - 1.2,
+  i
+);
       }
 
       if (i % 5 === 2) {
-        addSapling(group, side * (6.3 + (i % 3) * 0.4), z - 4, 1 + (i % 3) * 0.25);
+       addSapling(
+  group,
+  side * (5.0 + (i % 3) * 0.2),
+  z - 4,
+  1 + (i % 3) * 0.25
+);
       }
 
       if (i % 4 === 1) {
-        addTreeRoots(group, side * (8.6 + (i % 3) * 0.9), z, 1.4 + (i % 3) * 0.15);
+      addTree(
+  group,
+  side * (5.8 + (i % 3) * 0.25),
+  z,
+  1.3 + (i % 3) * 0.12,
+  true,
+  [1.6, 2.2, 2.8][i % 3]
+);
       }
 
       if (i % 3 === 0) {
@@ -457,17 +474,18 @@ function createJungle(group) {
 
       // Low bushes between the trees and the road.
       if (i % 2 === 1) {
-        addBush(group, side * 7.2, z - 1.5, 0.9 + (i % 3) * 0.2);
+     addBush(
+  group,
+  side * 4.9,
+  z - 1.5,
+  0.9 + (i % 3) * 0.2
+);
       }
 
       if (i % 2 === 0) {
         addRock(
           group,
-          side * (5.5 + (i % 2) * 0.5),
-          0,
-          z - 2,
-          0.5 + (i % 2) * 0.25,
-          0x59694a
+         side * 4.9
         );
       }
     }
@@ -558,17 +576,16 @@ function createAncientRuins(group) {
     const z = -18 - i * 32;
 
     for (const side of [-1, 1]) {
-      const x = side * (7.2 + (i % 2) * 1.0);
-
+     const x = side * (5.2 + (i % 2) * 0.3);
       addBox(
         group,
         'AncientRuinsWall',
         x, 0, z,
-        1.8, 13 + (i % 3) * 3, 6,
+    1.5, 13 + (i % 3) * 3, 6,
         material(stonePalette[(i + (side > 0 ? 1 : 0)) % stonePalette.length], 0.92)
       );
 
-      const pillarX = x - side * 2;
+     const pillarX = x - side * 0.8;
 
       addBox(
         group,
@@ -622,9 +639,8 @@ function createAncientRuins(group) {
   }
 
   for (let i = 0; i < 12; i++) {
-    addTree(group, -9.5, -i * 22, 0.75);
-    addTree(group, 9.5, -i * 22 - 8, 0.85);
-
+addTree(group, -5.8, -i * 22, 0.75);
+addTree(group, 5.8, -i * 22 - 8, 0.85);
     // Rubble and broken column stubs beside the paving, outside the
     // running corridor (|x| ≥ 5).
     for (const side of [-1, 1]) {
@@ -646,7 +662,7 @@ function createAncientRuins(group) {
     // tiers, and four corner columns. Set well outside the road.
     if (i % 4 === 0) {
       for (const side of [-1, 1]) {
-        addTempleLandmark(group, side * 13, -i * 22 - 14, stonePalette[(i + 2) % stonePalette.length]);
+addTempleLandmark(group, side * 11.5, -i * 22 - 14, stonePalette[(i + 2) % stonePalette.length]);
       }
     }
 
@@ -741,7 +757,7 @@ function createRiverBridge(group) {
     group,
     'BridgeDeck',
     0, -0.52, -ZONE_LENGTH / 2,
-    12.8, 0.45, ZONE_LENGTH,
+  9.6, 0.45, ZONE_LENGTH,
     bridgeMaterial
   );
 
@@ -756,8 +772,8 @@ function createRiverBridge(group) {
     addBox(
       group,
       'BridgeParapet',
-      side * 6.35, -0.07, -ZONE_LENGTH / 2,
-      0.45, 0.35, ZONE_LENGTH,
+    side * 4.65, -0.07, -ZONE_LENGTH / 2,
+0.35, 0.35, ZONE_LENGTH,
       parapetMaterial
     );
 
@@ -772,8 +788,8 @@ function createRiverBridge(group) {
       addBox(
         group,
         'BridgeRail',
-        side * 6.1, 0.12, -s - 10,
-        0.3, 1.1, 20,
+      side * 4.5, 0.12, -s - 10,
+0.3, 1.1, 20,
         variant
       );
     }
@@ -906,13 +922,11 @@ function createRiverZone(group) {
   // Riverbanks and scenery remain inside this zone.
   for (let i = 0; i < 24; i++) {
     const z = -i * 12;
-
-    addTree(group, -10 - (i % 3) * 0.6, z, 0.85, true, 2.2 + (i % 3) * 0.3);
-    addTree(group, 10 + (i % 2) * 0.6, z - 5, 0.9, true, 2.5 + (i % 2) * 0.3);
-
+addTree(group, -8.8 - (i % 3) * 0.3, z, 0.85, true, 2.2 + (i % 3) * 0.3);
+addTree(group, 8.8 + (i % 2) * 0.3, z - 5, 0.9, true, 2.5 + (i % 2) * 0.3);
     if (i % 2 === 0) {
-      addRock(group, -7.4, 0, z - 4, 0.8, 0x77766f);
-      addRock(group, 7.4, 0, z - 7, 0.8, 0x77766f);
+  addRock(group, -6.9, 0, z - 4, 0.8, 0x77766f);
+addRock(group, 6.9, 0, z - 7, 0.8, 0x77766f);
     }
   }
 }

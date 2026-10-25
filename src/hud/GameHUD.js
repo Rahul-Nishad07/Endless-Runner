@@ -30,45 +30,7 @@ export default function GameHUD({
 
       {!paused && (
         <>
-          {chaseMode && (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.chaseBox,
-                chaseState === 'WARNING' && styles.chaseWarning,
-                chaseState === 'CRITICAL' && styles.chaseCritical,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chaseLabel,
-                  chaseState === 'WARNING' && styles.chaseLabelWarning,
-                  chaseState === 'CRITICAL' && styles.chaseLabelCritical,
-                ]}
-              >
-                {chaseState === 'WAITING'
-                  ? '🚚 TRUCK INCOMING'
-                  : `🚚 ${chaseState} · ${Number(chaseDistance).toFixed(1)} m BEHIND`}
-              </Text>
-
-              <View style={styles.chaseTrack}>
-                <View
-                  style={[
-                    styles.chaseFill,
-                    {
-                      width: `${Math.max(
-                        0,
-                        Math.min(100, (chaseDistance / chaseMax) * 100)
-                      )}%`,
-                    },
-                    chaseState === 'WARNING' && styles.chaseFillWarning,
-                    chaseState === 'CRITICAL' && styles.chaseFillCritical,
-                  ]}
-                />
-              </View>
-            </View>
-          )}
-
+          {/* SCORE / DISTANCE / COINS */}
           <View pointerEvents="none" style={styles.topBar}>
             <View style={[styles.statBox, styles.leftBox]}>
               <Text style={styles.label}>SCORE</Text>
@@ -95,6 +57,7 @@ export default function GameHUD({
             </View>
           </View>
 
+          {/* PAUSE BUTTON */}
           <Pressable
             onPress={onTogglePause}
             style={({ pressed }) => [
@@ -109,6 +72,7 @@ export default function GameHUD({
         </>
       )}
 
+      {/* PAUSE OVERLAY */}
       {paused && (
         <View style={styles.pauseOverlay}>
           <View style={styles.scoreCard}>
@@ -124,6 +88,7 @@ export default function GameHUD({
               <Text style={styles.mainScoreLabel}>
                 CURRENT SCORE
               </Text>
+
               <Text style={styles.mainScoreValue}>
                 {formatNumber(score)}
               </Text>
@@ -187,10 +152,11 @@ export default function GameHUD({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 100,
     elevation: 100,
   },
+
   topBar: {
     position: 'absolute',
     top: 12,
@@ -200,6 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
+
   statBox: {
     flex: 1,
     minWidth: 0,
@@ -211,78 +178,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.30)',
   },
-  leftBox: { alignItems: 'flex-start' },
-  centerBox: { alignItems: 'center' },
-  rightBox: { alignItems: 'flex-end' },
+
+  leftBox: {
+    alignItems: 'flex-start',
+  },
+
+  centerBox: {
+    alignItems: 'center',
+  },
+
+  rightBox: {
+    alignItems: 'flex-end',
+  },
+
   label: {
     fontSize: 9,
     color: '#e2e8f0',
     fontWeight: '900',
     letterSpacing: 0.7,
   },
+
   scoreValue: {
     marginTop: 3,
     fontSize: 19,
     color: '#ffffff',
     fontWeight: '900',
   },
-  chaseBox: {
-    position: 'absolute',
-    top: 96,
-    left: 16,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(12, 24, 43, 0.82)',
-    borderWidth: 1,
-    borderColor: 'rgba(101, 223, 208, 0.45)',
-  },
 
-  chaseWarning: {
-    borderColor: 'rgba(255, 202, 40, 0.85)',
-  },
-
-  chaseCritical: {
-    borderColor: 'rgba(255, 82, 82, 0.95)',
-    backgroundColor: 'rgba(60, 10, 14, 0.85)',
-  },
-
-  chaseLabel: {
-    color: '#65dfd0',
-    fontSize: 11,
+  distanceValue: {
+    marginTop: 3,
+    fontSize: 14,
+    color: '#ffffff',
     fontWeight: '900',
-    letterSpacing: 1,
-  },
-
-  chaseLabelWarning: {
-    color: '#ffca28',
-  },
-
-  chaseLabelCritical: {
-    color: '#ff8a80',
-  },
-
-  chaseTrack: {
-    marginTop: 6,
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-  },
-
-  chaseFill: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#65dfd0',
-  },
-
-  chaseFillWarning: {
-    backgroundColor: '#ffca28',
-  },
-
-  chaseFillCritical: {
-    backgroundColor: '#ff5252',
   },
 
   tierValue: {
@@ -293,18 +220,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  distanceValue: {
-    marginTop: 3,
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '900',
-  },
   coinValue: {
     marginTop: 3,
     fontSize: 14,
     color: '#ffda58',
     fontWeight: '900',
   },
+
   pauseButton: {
     position: 'absolute',
     top: 83,
@@ -320,13 +242,15 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 110,
   },
+
   pauseIcon: {
     fontSize: 23,
     fontWeight: '900',
     color: '#172033',
   },
+
   pauseOverlay: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 120,
     elevation: 120,
     backgroundColor: 'rgba(5, 12, 25, 0.96)',
@@ -335,6 +259,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 16,
   },
+
   scoreCard: {
     width: '100%',
     maxWidth: 370,
@@ -346,18 +271,21 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#526d8b',
   },
+
   eyebrow: {
     color: '#65dfd0',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 3,
   },
+
   pauseTitle: {
     color: '#ffffff',
     fontSize: 32,
     fontWeight: '900',
     marginTop: 12,
   },
+
   subtitle: {
     color: '#d1dbea',
     fontSize: 13,
@@ -365,6 +293,7 @@ const styles = StyleSheet.create({
     marginTop: 7,
     marginBottom: 18,
   },
+
   mainScore: {
     width: '100%',
     borderRadius: 20,
@@ -374,18 +303,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#526d8b',
   },
+
   mainScoreLabel: {
     color: '#d1dbea',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 2,
   },
+
   mainScoreValue: {
     color: '#ffcf42',
     fontSize: 40,
     fontWeight: '900',
     marginTop: 5,
   },
+
   statsRow: {
     flexDirection: 'row',
     width: '100%',
@@ -393,6 +325,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 16,
   },
+
   detailCard: {
     flex: 1,
     borderRadius: 17,
@@ -400,19 +333,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#20334b',
   },
-  detailEmoji: { fontSize: 25 },
+
+  detailEmoji: {
+    fontSize: 25,
+  },
+
   detailLabel: {
     marginTop: 7,
     fontSize: 10,
     fontWeight: '800',
     color: '#d1dbea',
   },
+
   detailValue: {
     marginTop: 5,
     fontSize: 17,
     fontWeight: '900',
     color: '#ffffff',
   },
+
   resumeButton: {
     width: '100%',
     borderRadius: 16,
@@ -420,12 +359,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffca28',
   },
+
   resumeText: {
     color: '#172033',
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+
   restartButton: {
     width: '100%',
     marginTop: 10,
@@ -436,18 +377,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#68829e',
   },
+
   restartText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+
   footerText: {
     marginTop: 13,
     fontSize: 11,
     color: '#bdcbe0',
     textAlign: 'center',
   },
+
   pressed: {
     opacity: 0.8,
     transform: [{ scale: 0.97 }],

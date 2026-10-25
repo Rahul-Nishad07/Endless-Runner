@@ -5,21 +5,21 @@ export function createProps() {
   const group = new THREE.Group();
 
   const props = [
-    [-7.2, -22, 'barrier'],
-    [7.2, -32, 'sign'],
+  [-7.2, -22, 'barrier'],
+  [7.2, -32, 'sign'],
 
-    [-7.2, -52, 'sign'],
-    [7.2, -72, 'barrier'],
+  [-7.2, -52, 'sign'],
+  [7.2, -72, 'barrier'],
 
-    [-7.2, -92, 'sign'],
-    [7.2, -112, 'barrier'],
+  [-7.2, -92, 'sign'],
+  [7.2, -112, 'barrier'],
 
-    [-7.2, -132, 'barrier'],
-    [7.2, -152, 'sign'],
+  [-7.2, -132, 'barrier'],
+  [7.2, -152, 'sign'],
 
-    [-7.2, -172, 'sign'],
-    [7.2, -192, 'barrier'],
-  ];
+  [-7.2, -172, 'sign'],
+  [7.2, -192, 'barrier'],
+];
 
   props.forEach(([x, z, type]) => {
     const object =

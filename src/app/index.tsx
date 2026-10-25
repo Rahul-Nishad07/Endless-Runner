@@ -1450,9 +1450,10 @@ export default function GameScreen() {
     }
   };
 
+  
   const swipeGesture = useRef(
     Gesture.Pan()
-      .minDistance(10)
+      .minDistance(8)
       .activeOffsetX([-10, 10])
       .activeOffsetY([-10, 10])
       .runOnJS(true)
@@ -1472,25 +1473,52 @@ export default function GameScreen() {
         const dx = event.translationX;
         const dy = event.translationY;
 
-        if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) {
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        // Ignore tiny finger movements.
+        const MIN_SWIPE_DISTANCE = 20;
+
+        if (Math.max(absX, absY) < MIN_SWIPE_DISTANCE) {
+          return;
+        }
+
+        // Wait until one direction is clearly dominant.
+        // This reduces accidental actions from diagonal swipes.
+        const AXIS_DOMINANCE = 1.15;
+
+        const horizontalSwipe = absX > absY * AXIS_DOMINANCE;
+        const verticalSwipe = absY > absX * AXIS_DOMINANCE;
+
+        if (!horizontalSwipe && !verticalSwipe) {
           return;
         }
 
         const player = playerRef.current;
         if (!player) return;
 
+        // Consume this gesture only once.
         swipeHandledRef.current = true;
 
-        // Sounds play only for accepted actions. Rejected swipes (edge
-        // of road, already airborne or sliding) stay silent.
-        if (Math.abs(dx) > Math.abs(dy)) {
-          const moved = dx < 0 ? player.moveLeft() : player.moveRight();
+        if (horizontalSwipe) {
+          const moved =
+            dx < 0 ? player.moveLeft() : player.moveRight();
 
-          if (moved) audioManager.playSfx('lane_switch');
-        } else if (dy < 0) {
-          if (player.jump()) audioManager.playSfx('jump');
-        } else if (player.slide()) {
-          audioManager.playSfx('slide');
+          if (moved) {
+            audioManager.playSfx('lane_switch');
+          }
+
+          return;
+        }
+
+        if (dy < 0) {
+          if (player.jump()) {
+            audioManager.playSfx('jump');
+          }
+        } else {
+          if (player.slide()) {
+            audioManager.playSfx('slide');
+          }
         }
       })
   ).current;
@@ -1627,6 +1655,7 @@ const {
   coins: coinGroup,
   player,
   environment,
+  
 } = world;
 
 sceneRef.current = scene;
@@ -1818,6 +1847,7 @@ playerAuraRef.current = player.group
           const previousDistance = distanceRef.current;
 
           distanceRef.current += currentWorldSpeed * delta;
+          playerRef.current?.setRunDistance(distanceRef.current);
 
           // Chase: the truck closes on mistakes and falls back after clean
           // running. Only runs while the game is running, so pauses and
@@ -1911,6 +1941,9 @@ playerAuraRef.current = player.group
           };
 
           playerRef.current?.setWorldSpeed(currentWorldSpeed);
+          playerRef.current?.setRunCadenceSpeed(
+  getTargetWorldSpeed(distanceRef.current)
+);
           playerRef.current?.setFlying?.(activePowerUpsRef.current.fly > 0);
           const motionEvents = playerRef.current?.update(delta) ?? [];
 
@@ -2073,10 +2106,14 @@ playerAuraRef.current = player.group
 
           renderer.setSize(bufferWidth, bufferHeight, false);
 
-          if (camera.aspect !== undefined) {
-            camera.aspect = bufferWidth / bufferHeight;
-            camera.updateProjectionMatrix();
-          }
+         if (
+  camera instanceof THREE.PerspectiveCamera &&
+  bufferWidth > 0 &&
+  bufferHeight > 0
+) {
+  camera.aspect = bufferWidth / bufferHeight;
+  camera.updateProjectionMatrix();
+}
 
           if (__DEV__) {
             console.log(`[GAME] drawing buffer resized to ${bufferWidth} x ${bufferHeight}`);
@@ -2800,7 +2837,7 @@ const styles = StyleSheet.create({
   },
 
   gl: {
-    ...StyleSheet.absoluteFill,
+     ...StyleSheet.absoluteFill,
     zIndex: 0,
   },
 
@@ -2870,7 +2907,7 @@ const styles = StyleSheet.create({
   },
 
   initErrorPanel: {
-    ...StyleSheet.absoluteFill,
+     ...StyleSheet.absoluteFill,
     zIndex: 30,
     elevation: 30,
     justifyContent: 'center',
@@ -2895,7 +2932,7 @@ const styles = StyleSheet.create({
   },
 
   hudLayer: {
-   ...StyleSheet.absoluteFill,
+     ...StyleSheet.absoluteFill,
     zIndex: 20,
     elevation: 20,
   },
@@ -2940,7 +2977,7 @@ const styles = StyleSheet.create({
   },
 
   welcomeOverlay: {
-    ...StyleSheet.absoluteFill,
+     ...StyleSheet.absoluteFill,
     zIndex: 150,
     elevation: 150,
     backgroundColor: 'rgba(5, 15, 32, 0.50)',
@@ -3079,9 +3116,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
     overflow: 'hidden',
+    textAlign: 'center',
   },
-
-
 
   homeButton: {
     width: '100%',
@@ -3100,7 +3136,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
-
 
   startButtonText: {
     color: '#172033',
@@ -3144,7 +3179,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
 
   welcomeFooter: {
@@ -3163,43 +3198,51 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 25, 25, 0.32)',
   },
 
+  // ========================================
+  // GAME OVER OVERLAY
+  // ========================================
+
   gameOverOverlay: {
-    ...StyleSheet.absoluteFill,
+   ...StyleSheet.absoluteFill,
     zIndex: 200,
     elevation: 200,
     backgroundColor: 'rgba(5, 12, 25, 0.96)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 20,
-  },
-
-  gameOverBody: {
-    width: '100%',
-    flexShrink: 1,
-  },
-
-  gameOverBodyContent: {
-    alignItems: 'center',
-    paddingBottom: 4,
-  },
-
-  gameOverFooter: {
-    width: '100%',
-    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 
   gameOverCard: {
     width: '100%',
     maxWidth: 370,
+    maxHeight: '100%',
     flexShrink: 1,
-    borderRadius: 28,
-    paddingHorizontal: 22,
-    paddingVertical: 20,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
     alignItems: 'center',
     backgroundColor: '#172840',
     borderWidth: 1.5,
     borderColor: '#526d8b',
+  },
+
+  gameOverBody: {
+    width: '100%',
+    flexShrink: 1,
+    minHeight: 0,
+  },
+
+  gameOverBodyContent: {
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+
+  gameOverFooter: {
+    width: '100%',
+    flexShrink: 0,
+    marginTop: 8,
   },
 
   eyebrow: {
@@ -3211,24 +3254,26 @@ const styles = StyleSheet.create({
 
   gameOverTitle: {
     color: '#ffffff',
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '900',
-    marginTop: 16,
+    marginTop: 8,
     letterSpacing: 1,
+    textAlign: 'center',
   },
 
   subtitle: {
     color: '#d1dbea',
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 22,
+    marginTop: 6,
+    marginBottom: 12,
   },
 
   finalScoreCard: {
     width: '100%',
-    borderRadius: 20,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
     backgroundColor: '#223b58',
     borderWidth: 1,
@@ -3244,45 +3289,107 @@ const styles = StyleSheet.create({
 
   finalScore: {
     color: '#ffcf42',
-    fontSize: 44,
+    fontSize: 38,
     fontWeight: '900',
-    marginTop: 6,
+    marginTop: 4,
+    textAlign: 'center',
   },
 
-  statsRow: {
-    flexDirection: 'row',
+  bestHint: {
+    marginTop: 8,
+    color: '#9fb3cc',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  scoreGrid: {
     width: '100%',
-    marginTop: 15,
-    marginBottom: 22,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+
+
+  // Adventure Mode stats row
+  statsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 12,
   },
 
   statCard: {
     flex: 1,
-    marginHorizontal: 6,
-    borderRadius: 17,
-    paddingVertical: 15,
+    minWidth: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+    borderRadius: 14,
     backgroundColor: '#20334b',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
 
-
   statLabel: {
-    marginTop: 8,
+    color: '#9fb3cc',
     fontSize: 10,
     fontWeight: '800',
-    color: '#d1dbea',
+    letterSpacing: 0.7,
+    textAlign: 'center',
   },
 
   statValue: {
     marginTop: 5,
+    color: '#ffffff',
     fontSize: 17,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+
+  scoreTile: {
+    width: '48%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#20334b',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+
+  scoreTileEmoji: {
+    fontSize: 17,
+  },
+
+  scoreTileValue: {
+    marginTop: 3,
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+
+  scoreTileLabel: {
+    marginTop: 3,
+    color: '#9fb3cc',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textAlign: 'center',
   },
 
   runOverBadge: {
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
@@ -3290,78 +3397,76 @@ const styles = StyleSheet.create({
     borderColor: '#ff5252',
     backgroundColor: 'rgba(255, 82, 82, 0.16)',
   },
+
   runOverBadgeText: {
     color: '#ff8a80',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 2,
   },
-  bestHint: {
-    marginTop: 8,
-    color: '#9fb3cc',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  scoreGrid: {
-    width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 10,
-    marginTop: 16,
-    marginBottom: 18,
-  },
-  scoreTile: {
-    width: '48%',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: '#20334b',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  scoreTileEmoji: {
-    fontSize: 20,
-  },
-  scoreTileValue: {
-    marginTop: 4,
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  scoreTileLabel: {
-    marginTop: 3,
-    color: '#9fb3cc',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  actionRow: {
-    width: '100%',
-    flexDirection: 'row',
-    gap: 10,
-  },
 
+  // Fixed action area beneath the scrollable score section.
   reviveButton: {
     width: '100%',
-    marginTop: 12,
-    borderRadius: 16,
-    paddingVertical: 15,
+    marginTop: 4,
+    borderRadius: 13,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#65dfd0',
   },
 
   reviveButtonText: {
     color: '#172033',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+
+  actionRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
   },
 
   actionFlex: {
     flex: 1,
+    minWidth: 0,
     marginTop: 0,
   },
+
+  restartButton: {
+    width: '100%',
+    borderRadius: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffca28',
+  },
+
+  restartText: {
+    color: '#172033',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+
+  footerText: {
+    marginTop: 7,
+    fontSize: 10,
+    color: '#bdcbe0',
+    textAlign: 'center',
+  },
+
+  // ========================================
+  // POWER-UPS AND SPEED
+  // ========================================
+
   flyBadge: {
     borderColor: '#7fe9ff',
     backgroundColor: 'rgba(0, 179, 255, 0.35)',
@@ -3387,30 +3492,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3df5ff',
   },
 
-  restartButton: {
-    width: '100%',
-    borderRadius: 16,
-    paddingVertical: 17,
-    alignItems: 'center',
-    backgroundColor: '#ffca28',
-  },
-
-  restartText: {
-    color: '#172033',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-
-  footerText: {
-    marginTop: 16,
-    fontSize: 12,
-    color: '#bdcbe0',
-    textAlign: 'center',
-  },
+  // ========================================
+  // RESTART / LOADING
+  // ========================================
 
   restartLoadingOverlay: {
-    ...StyleSheet.absoluteFill,
+      ...StyleSheet.absoluteFill,
     zIndex: 300,
     elevation: 300,
     backgroundColor: '#08172b',

@@ -1,20 +1,11 @@
-// ============================================
-// TRAFFIC MANAGER
-//
-// Oncoming cars that spawn ahead of the player and drive toward them.
-// Runs inside the existing game loop, with delta-time movement and no
-// timers of its own.
-//
-// Fairness rules:
-// - A car spawns only in a lane that has no car or obstacle near the
-//   spawn point.
-// - Spawning stops once two lanes are blocked near the spawn point, so
-//   there is always a lane to move into.
-// - Cars only spawn in zones that have roads for them (City and Bridge).
-//
-// Pooled: a fixed set of vehicles is created once and reused. Nothing is
-// created or destroyed during a run.
-// ============================================
+
+ // ============================================
+ // TRAFFIC MANAGER
+ // Fast oncoming cars and vans for the endless runner.
+ //
+ // Keeps existing lane selection, collision detection,
+ // pooling, zone restrictions and restart behavior.
+ // ============================================
 
 import * as THREE from 'three';
 
@@ -25,34 +16,34 @@ export const TRAFFIC_CONFIG = {
   poolSize: 8,
   maxActive: 5,
 
-  // Spawn and recycle positions along Z. The player is at z = 2.
+  // Spawn and recycle positions along Z. Player is at z = 2.
   spawnZ: -150,
   recycleZ: 12,
   playerZ: 2,
 
-  // Half-width of the player's collision box, and half the depth.
+  // Player collision dimensions.
   playerHalfWidth: 0.4,
   playerHalfDepth: 0.35,
 
-  // Spawn timing, in seconds: slower early, faster later.
-  intervalEarly: 2.6,
-  intervalLate: 1.5,
+ // Spawn timing
+intervalEarly: 1.8,
+intervalLate: 1.0,
 
-  // Extra approach speed on top of the world speed (units/s).
-  extraSpeedEarly: 4,
-  extraSpeedLate: 9,
+// Extra approach speed on top of world speed
+extraSpeedEarly: 14,
+extraSpeedLate: 24,
 
-  // Distance (m) over which difficulty rises from early to late values.
-  rampDistance: 3000,
+// Distance over which difficulty increases
+rampDistance: 2500,
 
-  // Blocking check around the spawn point.
+  // Keep the existing spawn fairness rules.
   blockWindow: 10,
   blockedLaneLimit: 2,
 
-  // Share of spawns that are vans rather than cars.
+  // Share of spawns that are vans.
   vanChance: 0.3,
 
-  // Zones with traffic. Other zones have no road for it.
+  // Only zones with roads for traffic.
   zones: ['City', 'Bridge'],
 };
 
@@ -62,20 +53,25 @@ const lerp = (from, to, t) => from + (to - from) * t;
 export function getSpawnInterval(distance) {
   const t = clamp01(distance / TRAFFIC_CONFIG.rampDistance);
 
-  return lerp(TRAFFIC_CONFIG.intervalEarly, TRAFFIC_CONFIG.intervalLate, t);
+  return lerp(
+    TRAFFIC_CONFIG.intervalEarly,
+    TRAFFIC_CONFIG.intervalLate,
+    t
+  );
 }
 
 export function getExtraSpeed(distance) {
   const t = clamp01(distance / TRAFFIC_CONFIG.rampDistance);
 
-  return lerp(TRAFFIC_CONFIG.extraSpeedEarly, TRAFFIC_CONFIG.extraSpeedLate, t);
+  return lerp(
+    TRAFFIC_CONFIG.extraSpeedEarly,
+    TRAFFIC_CONFIG.extraSpeedLate,
+    t
+  );
 }
 
 /**
  * Creates the traffic system and adds its group to the scene.
- * `scene` may be null in tests.
- */
-/**
  * @param {any} [scene]
  */
 export function createTrafficManager(scene = null) {
@@ -86,7 +82,7 @@ export function createTrafficManager(scene = null) {
     scene.add(threeGroup);
   }
 
-  // Alternate car and van types so the pool holds both.
+  // Keep the existing pooled mix of cars and vans.
   const pool = [];
 
   for (let i = 0; i < TRAFFIC_CONFIG.poolSize; i++) {
@@ -114,15 +110,19 @@ export function createTrafficManager(scene = null) {
     let best = 0;
 
     for (let i = 1; i < LANE_X.length; i++) {
-      if (Math.abs(LANE_X[i] - x) < Math.abs(LANE_X[best] - x)) best = i;
+      if (
+        Math.abs(LANE_X[i] - x) <
+        Math.abs(LANE_X[best] - x)
+      ) {
+        best = i;
+      }
     }
 
     return best;
   }
 
   /**
-   * Lanes that have a car or obstacle near the spawn point.
-   * Returns a Set of lane indices.
+   * Returns lanes occupied near the spawn point.
    */
   function getBlockedLanes(obstacles) {
     const blocked = new Set();
@@ -131,7 +131,10 @@ export function createTrafficManager(scene = null) {
     for (const entry of pool) {
       if (!entry.active) continue;
 
-      if (Math.abs(entry.vehicle.position.z - spawnZ) < blockWindow) {
+      if (
+        Math.abs(entry.vehicle.position.z - spawnZ) <
+        blockWindow
+      ) {
         blocked.add(entry.lane);
       }
     }
@@ -139,7 +142,10 @@ export function createTrafficManager(scene = null) {
     for (const obstacle of obstacles) {
       if (!obstacle || !obstacle.visible) continue;
 
-      if (Math.abs(obstacle.position.z - spawnZ) < blockWindow) {
+      if (
+        Math.abs(obstacle.position.z - spawnZ) <
+        blockWindow
+      ) {
         blocked.add(laneIndexOf(obstacle.position.x));
       }
     }
@@ -147,17 +153,22 @@ export function createTrafficManager(scene = null) {
     return blocked;
   }
 
-  /** Picks a lane for a new car, or null if no spawn is safe right now. */
+  /**
+   * Picks a safe lane for the next vehicle.
+   */
   function chooseLane(obstacles) {
     const blocked = getBlockedLanes(obstacles);
 
-    // Adding one more lane must keep the blocked count within the limit.
-    if (blocked.size >= TRAFFIC_CONFIG.blockedLaneLimit) return null;
+    if (blocked.size >= TRAFFIC_CONFIG.blockedLaneLimit) {
+      return null;
+    }
 
     const free = [];
 
     for (let lane = 0; lane < LANE_X.length; lane++) {
-      if (!blocked.has(lane)) free.push(lane);
+      if (!blocked.has(lane)) {
+        free.push(lane);
+      }
     }
 
     if (free.length === 0) return null;
@@ -176,15 +187,19 @@ export function createTrafficManager(scene = null) {
   }
 
   function spawn(obstacles) {
-    if (activeCount() >= TRAFFIC_CONFIG.maxActive) return false;
+    if (activeCount() >= TRAFFIC_CONFIG.maxActive) {
+      return false;
+    }
 
     const lane = chooseLane(obstacles);
     if (lane === null) return false;
 
     const wantVan = Math.random() < TRAFFIC_CONFIG.vanChance;
+
     const entry =
-      pool.find((e) => !e.active && (e.type === 'van') === wantVan) ||
-      pool.find((e) => !e.active);
+      pool.find(
+        (e) => !e.active && (e.type === 'van') === wantVan
+      ) || pool.find((e) => !e.active);
 
     if (!entry) return false;
 
@@ -193,7 +208,12 @@ export function createTrafficManager(scene = null) {
     entry.hit = false;
     entry.passed = false;
 
-    entry.vehicle.position.set(LANE_X[lane], 0, TRAFFIC_CONFIG.spawnZ);
+    entry.vehicle.position.set(
+      LANE_X[lane],
+      0,
+      TRAFFIC_CONFIG.spawnZ
+    );
+
     entry.vehicle.visible = true;
 
     spawned++;
@@ -212,11 +232,8 @@ export function createTrafficManager(scene = null) {
     group: threeGroup,
 
     /**
-     * Advances traffic by one frame. Call from the game loop only while
-     * the game is running. `onHit(vehicle)` runs at most once per car.
-     * `onPass(vehicle)` runs once per car that the runner dodges cleanly.
-     */
-    /**
+     * Call once per game-loop frame while the game is running.
+     *
      * @param {{
      *   delta: number,
      *   speed: number,
@@ -228,11 +245,27 @@ export function createTrafficManager(scene = null) {
      *   onPass?: (vehicle: any) => void,
      * }} frame
      */
-    update({ delta, speed, distance, zoneName, obstacles = [], playerX = 0, onHit = (vehicle) => {}, onPass = (vehicle) => {} }) {
+    update({
+      delta,
+      speed,
+      distance,
+      zoneName,
+      obstacles = [],
+      playerX = 0,
+      onHit = (vehicle) => {},
+      onPass = (vehicle) => {},
+    }) {
+      // Prevent unusually large frame steps.
       const dt = Math.min(Math.max(delta || 0, 0), 0.05);
       if (dt <= 0) return;
 
-      const { recycleZ, playerZ, playerHalfWidth, playerHalfDepth } = TRAFFIC_CONFIG;
+      const {
+        recycleZ,
+        playerZ,
+        playerHalfWidth,
+        playerHalfDepth,
+      } = TRAFFIC_CONFIG;
+
       const zoneAllowed = TRAFFIC_CONFIG.zones.includes(zoneName);
 
       if (zoneAllowed) {
@@ -241,7 +274,7 @@ export function createTrafficManager(scene = null) {
         if (spawnTimer >= getSpawnInterval(distance)) {
           spawnTimer = 0;
 
-          // If the spawn was blocked, retry soon instead of waiting a full interval.
+          // Retry sooner if no safe lane is available.
           if (!spawn(obstacles)) {
             spawnTimer = getSpawnInterval(distance) * 0.5;
           }
@@ -250,16 +283,18 @@ export function createTrafficManager(scene = null) {
         spawnTimer = 0;
       }
 
+      // Extra traffic speed increases as distance increases.
       const extra = getExtraSpeed(distance);
+      const approachSpeed = Math.max(0, speed) + extra;
 
       for (const entry of pool) {
         if (!entry.active) continue;
 
         const vehicle = entry.vehicle;
-
-        // Cars approach the player at world speed plus their own speed.
         const previousZ = vehicle.position.z;
-        vehicle.position.z += (speed + extra) * dt;
+
+        // Cars and vans approach the player faster.
+        vehicle.position.z += approachSpeed * dt;
 
         if (vehicle.position.z > recycleZ) {
           deactivate(entry);
@@ -268,23 +303,30 @@ export function createTrafficManager(scene = null) {
 
         if (entry.hit) continue;
 
-        const lateral = vehicle.userData.halfWidth + playerHalfWidth;
-        const longitudinal = vehicle.userData.halfLength + playerHalfDepth;
+        const lateral =
+          vehicle.userData.halfWidth + playerHalfWidth;
 
-        // Clean dodge: the car has fully passed the player, without a hit.
-        // Counted once per car, and only if it was in the runner's lane.
-        if (!entry.passed && previousZ > playerZ + longitudinal) {
+        const longitudinal =
+          vehicle.userData.halfLength + playerHalfDepth;
+
+        // Count a clean dodge once the vehicle passes the player.
+        if (
+          !entry.passed &&
+          previousZ > playerZ + longitudinal
+        ) {
           entry.passed = true;
 
-          if (Math.abs(vehicle.position.x - playerX) < lateral) {
+          if (
+            Math.abs(vehicle.position.x - playerX) < lateral
+          ) {
             onPass(vehicle);
           }
         }
 
-        const overlapX = Math.abs(vehicle.position.x - playerX) < lateral;
-        // Swept test: the car's path this step must reach the player's
-        // zone. A single end-of-step check could skip over the player at
-        // boosted speed.
+        const overlapX =
+          Math.abs(vehicle.position.x - playerX) < lateral;
+
+        // Swept collision check helps avoid missed hits at higher speed.
         const overlapZ =
           previousZ < playerZ + longitudinal &&
           vehicle.position.z > playerZ - longitudinal;
@@ -299,7 +341,9 @@ export function createTrafficManager(scene = null) {
       }
     },
 
-    /** Clears every car and the spawn timer. Used on restart. */
+    /**
+     * Clears all vehicles and resets the spawn timer.
+     */
     reset() {
       for (const entry of pool) {
         deactivate(entry);
@@ -308,7 +352,9 @@ export function createTrafficManager(scene = null) {
       spawnTimer = 0;
     },
 
-    /** Removes the traffic group from the scene. */
+    /**
+     * Removes the traffic group from the scene.
+     */
     dispose() {
       for (const entry of pool) {
         deactivate(entry);
@@ -330,4 +376,3 @@ export function createTrafficManager(scene = null) {
     _pool: pool,
   };
 }
-

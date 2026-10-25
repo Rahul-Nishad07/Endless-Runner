@@ -3,24 +3,28 @@ import * as THREE from 'three';
 
 import { LANE_WIDTH, LANE_X } from '../game/GameConfig';
 
-// Three lanes, each LANE_WIDTH wide, with a small margin on each side.
-export const ROAD_WIDTH = LANE_WIDTH * 3 + 3;
+// ============================================
+// ROAD CONFIGURATION
+// ============================================
+
+// Narrower road while preserving the existing three lane positions.
+// LANE_X remains [-2, 0, 2].
+export const ROAD_WIDTH = LANE_WIDTH * 3 + 1.2;
 export const ROAD_HALF_WIDTH = ROAD_WIDTH / 2;
+
 export const ROAD_LENGTH = 300;
 export const ROAD_CENTER_Z = -125;
 export const LANE_POSITIONS = LANE_X;
 
-// Lane dividers sit on the boundaries between lanes: ±1 (between
-// left/centre and centre/right) and ±3 (outer edges of the lanes).
+const ZONE_ROAD_LENGTH = 280;
+
+// Keep all road markings aligned with the existing lane layout.
 const LANE_DIVIDERS = [
   -LANE_WIDTH / 2,
   LANE_WIDTH / 2,
-  -LANE_WIDTH * 1.5,
-  LANE_WIDTH * 1.5,
 ];
 
-const ZONE_ROAD_LENGTH = 280;
-
+// Use shared materials to avoid unnecessary duplication.
 const ROAD_STYLES = {
   City: {
     surface: 0x292c31,
@@ -40,7 +44,6 @@ const ROAD_STYLES = {
     edge: 0xc7b99b,
     shoulder: 0xb7a06b,
   },
-  // Bridge and River were missing here, so both used the City road.
   Bridge: {
     surface: 0x4d5257,
     marking: 0xd9d4bd,
@@ -69,13 +72,12 @@ const ROAD_STYLES = {
 
 // ============================================
 // ROAD DETAIL DECALS
-//
-// Flat marks on the road surface: patches, cracks, joints, seams and
-// leaf litter. They sit at y ≈ 0.03 and have no collision, so they
-// cannot block the player. Geometry and materials are shared.
 // ============================================
 
-const decalCache = { geometry: new Map(), material: new Map() };
+const decalCache = {
+  geometry: new Map(),
+  material: new Map(),
+};
 
 function decalGeometry(kind, w, h) {
   const key = `${kind}:${w}:${h}`;
@@ -102,7 +104,6 @@ function decalMaterial(color, opacity = 1) {
         color,
         transparent: opacity < 1,
         opacity,
-        // Pulls decals slightly toward the camera to avoid flicker.
         polygonOffset: true,
         polygonOffsetFactor: -2,
       })
@@ -112,7 +113,17 @@ function decalMaterial(color, opacity = 1) {
   return decalCache.material.get(key);
 }
 
-function addDecal(group, kind, x, z, w, h, color, opacity = 1, rotationZ = 0) {
+function addDecal(
+  group,
+  kind,
+  x,
+  z,
+  w,
+  h,
+  color,
+  opacity = 1,
+  rotationZ = 0
+) {
   const mesh = new THREE.Mesh(
     decalGeometry(kind, w, h),
     decalMaterial(color, opacity)
@@ -123,63 +134,144 @@ function addDecal(group, kind, x, z, w, h, color, opacity = 1, rotationZ = 0) {
   mesh.position.set(x, 0.03, z);
   mesh.name = 'RoadDecal';
   mesh.receiveShadow = true;
+
   group.add(mesh);
 }
 
 const ZONE_DECALS = {
-  // City: patches and drain covers on the outer margins.
   City(group, length) {
     for (let i = 0; i < length / 40; i++) {
-      addDecal(group, 'plane', (i % 2 ? 1 : -1) * 1.8, -i * 40 - 12, 3.2, 1.6, 0x1b1d20, 0.55);
+      addDecal(
+        group,
+        'plane',
+        (i % 2 ? 1 : -1) * 1.55,
+        -i * 40 - 12,
+        1.1,
+        1.6,
+        0x1b1d20,
+        0.55
+      );
     }
 
     for (let i = 0; i < length / 60; i++) {
-      addDecal(group, 'disc', (i % 2 ? 3.6 : -3.6), -i * 60 - 30, 0.55, 0, 0x3a3d42);
+      addDecal(
+        group,
+        'disc',
+        i % 2 ? 2.8 : -2.8,
+        -i * 60 - 30,
+        0.4,
+        0,
+        0x3a3d42
+      );
     }
   },
 
-  // Jungle: leaf litter and damp patches.
   Jungle(group, length) {
     for (let i = 0; i < length / 14; i++) {
-      const x = ((i * 37) % 9) - 4.2;
-      addDecal(group, 'disc', x, -i * 14 - 6, 0.9 + (i % 3) * 0.3, 0, 0x3d4a22, 0.5);
+      const x = ((i * 37) % 7) - 3;
+
+      addDecal(
+        group,
+        'disc',
+        x,
+        -i * 14 - 6,
+        0.7 + (i % 3) * 0.2,
+        0,
+        0x3d4a22,
+        0.5
+      );
     }
   },
 
-  // Bridge: expansion joints across the deck, and a few cracks.
   Bridge(group, length) {
     for (let i = 0; i < length / 24; i++) {
-      addDecal(group, 'plane', 0, -i * 24 - 12, ROAD_WIDTH, 0.25, 0x15171a, 0.8);
+      addDecal(
+        group,
+        'plane',
+        0,
+        -i * 24 - 12,
+        ROAD_WIDTH,
+        0.25,
+        0x15171a,
+        0.8
+      );
     }
 
-    // Worn, lighter patches near the edges of the deck.
     for (let i = 0; i < length / 60; i++) {
-      addDecal(group, 'disc', (i % 2 ? 2.6 : -2.4), -i * 60 - 40, 1.1, 0, 0x6b6f72, 0.5);
+      addDecal(
+        group,
+        'disc',
+        i % 2 ? 2.2 : -2.2,
+        -i * 60 - 40,
+        0.8,
+        0,
+        0x6b6f72,
+        0.5
+      );
     }
 
     for (let i = 0; i < length / 46; i++) {
-      addDecal(group, 'plane', (i % 2 ? 1.6 : -1.4), -i * 46 - 20, 0.08, 3.4, 0x1b1d20, 0.6, 0.12);
+      addDecal(
+        group,
+        'plane',
+        i % 2 ? 1.4 : -1.4,
+        -i * 46 - 20,
+        0.08,
+        3.4,
+        0x1b1d20,
+        0.6,
+        0.12
+      );
     }
   },
 
-  // Ancient Ruins: flagstone seams and gravel patches.
   'Ancient Ruins'(group, length) {
     for (let i = 0; i < length / 6; i++) {
-      addDecal(group, 'plane', 0, -i * 6, ROAD_WIDTH, 0.06, 0xb9ad8a, 0.7);
+      addDecal(
+        group,
+        'plane',
+        0,
+        -i * 6,
+        ROAD_WIDTH,
+        0.06,
+        0xb9ad8a,
+        0.7
+      );
     }
 
     for (let i = 0; i < length / 30; i++) {
-      addDecal(group, 'disc', (i % 2 ? 2.2 : -2.4), -i * 30 - 9, 0.7, 0, 0x9c8e70, 0.6);
+      addDecal(
+        group,
+        'disc',
+        i % 2 ? 2 : -2,
+        -i * 30 - 9,
+        0.55,
+        0,
+        0x9c8e70,
+        0.6
+      );
     }
   },
 
-  // River: wet patches on the road.
   River(group, length) {
     for (let i = 0; i < length / 32; i++) {
-      addDecal(group, 'disc', (i % 3) - 1, -i * 32 - 14, 1.2, 0, 0x4f4a40, 0.45);
+      addDecal(
+        group,
+        'disc',
+        (i % 3) - 1,
+        -i * 32 - 14,
+        0.9,
+        0,
+        0x4f4a40,
+        0.45
+      );
     }
   },
 };
+
+// ============================================
+// ZONE ROAD SEGMENT
+// ============================================
 
 export function createRoadSegment(
   styleName,
@@ -192,7 +284,7 @@ export function createRoadSegment(
   group.userData.isZoneRoad = true;
   group.userData.zoneName = styleName;
 
-  // Main road surface.
+  // Main asphalt.
   const asphalt = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_WIDTH, length),
     new THREE.MeshStandardMaterial({
@@ -206,6 +298,7 @@ export function createRoadSegment(
   asphalt.rotation.x = -Math.PI / 2;
   asphalt.position.set(0, 0.012, -length / 2);
   asphalt.receiveShadow = true;
+
   group.add(asphalt);
 
   const edgeMaterial = new THREE.MeshBasicMaterial({
@@ -220,16 +313,21 @@ export function createRoadSegment(
     color: style.marking,
   });
 
-  // Road edge and shoulder lines.
+  // Edge and shoulder lines follow the narrower road boundaries.
   for (const side of [-1, 1]) {
     const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.12, length),
+      new THREE.PlaneGeometry(0.1, length),
       edgeMaterial
     );
 
     edge.rotation.x = -Math.PI / 2;
-    edge.position.set(side * (ROAD_HALF_WIDTH - 0.25), 0.025, -length / 2);
+    edge.position.set(
+      side * (ROAD_HALF_WIDTH - 0.12),
+      0.025,
+      -length / 2
+    );
     edge.name = 'ZoneRoadEdge';
+
     group.add(edge);
 
     const shoulder = new THREE.Mesh(
@@ -238,13 +336,18 @@ export function createRoadSegment(
     );
 
     shoulder.rotation.x = -Math.PI / 2;
-    shoulder.position.set(side * (ROAD_HALF_WIDTH - 0.55), 0.027, -length / 2);
+    shoulder.position.set(
+      side * (ROAD_HALF_WIDTH - 0.38),
+      0.027,
+      -length / 2
+    );
     shoulder.name = 'ZoneRoadShoulder';
+
     group.add(shoulder);
   }
 
-  // Two dashed lane dividers.
-  const dashGeometry = new THREE.PlaneGeometry(0.12, 4.2);
+  // Two lane dividers between the three playable lanes.
+  const dashGeometry = new THREE.PlaneGeometry(0.1, 4.2);
 
   for (const x of LANE_DIVIDERS) {
     for (let i = 0; i < Math.ceil(length / 9); i++) {
@@ -258,7 +361,7 @@ export function createRoadSegment(
     }
   }
 
-  // Roadside reflectors.
+  // Reflectors remain outside the asphalt.
   const reflectorMaterial = new THREE.MeshStandardMaterial({
     color: style.edge,
     emissive: style.edge,
@@ -271,24 +374,32 @@ export function createRoadSegment(
 
     for (const side of [-1, 1]) {
       const reflector = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.12, 0.45),
+        new THREE.BoxGeometry(0.12, 0.12, 0.4),
         reflectorMaterial
       );
 
-      reflector.position.set(side * (ROAD_HALF_WIDTH + 0.2), 0.09, z);
+      reflector.position.set(
+        side * (ROAD_HALF_WIDTH + 0.12),
+        0.09,
+        z
+      );
       reflector.name = 'RoadsideReflector';
+
       group.add(reflector);
     }
   }
 
-  // Zone-specific surface marks (patches, joints, seams, litter).
   ZONE_DECALS[styleName]?.(group, length);
 
   return group;
 }
 
-// Legacy standalone road. Kept for compatibility with other modules.
-// GameWorld should not add this road on top of the zone roads.
+// ============================================
+// LEGACY STANDALONE ROAD
+// ============================================
+// Retained for compatibility. GameWorld should not add this on top
+// of the zone roads.
+
 export function createRoad() {
   const group = new THREE.Group();
   group.name = 'RunnerRoad';
@@ -305,6 +416,7 @@ export function createRoad() {
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, 0, ROAD_CENTER_Z);
   road.receiveShadow = true;
+
   group.add(road);
 
   const white = new THREE.MeshBasicMaterial({
@@ -327,13 +439,18 @@ export function createRoad() {
 
   for (const side of [-1, 1]) {
     const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.12, ROAD_LENGTH),
+      new THREE.PlaneGeometry(0.1, ROAD_LENGTH),
       white
     );
 
     edge.rotation.x = -Math.PI / 2;
-    edge.position.set(side * 5.25, 0.025, ROAD_CENTER_Z);
+    edge.position.set(
+      side * (ROAD_HALF_WIDTH - 0.12),
+      0.025,
+      ROAD_CENTER_Z
+    );
     edge.name = 'RoadEdgeLine';
+
     group.add(edge);
 
     const shoulder = new THREE.Mesh(
@@ -342,27 +459,43 @@ export function createRoad() {
     );
 
     shoulder.rotation.x = -Math.PI / 2;
-    shoulder.position.set(side * 4.95, 0.027, ROAD_CENTER_Z);
+    shoulder.position.set(
+      side * (ROAD_HALF_WIDTH - 0.38),
+      0.027,
+      ROAD_CENTER_Z
+    );
     shoulder.name = 'RoadShoulderLine';
+
     group.add(shoulder);
 
+    // Narrower sidewalks sit just outside the road.
     const sidewalk = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.2, ROAD_LENGTH),
+      new THREE.PlaneGeometry(0.8, ROAD_LENGTH),
       sidewalkMaterial
     );
 
     sidewalk.rotation.x = -Math.PI / 2;
-    sidewalk.position.set(side * 6.6, 0.01, ROAD_CENTER_Z);
+    sidewalk.position.set(
+      side * (ROAD_HALF_WIDTH + 0.5),
+      0.01,
+      ROAD_CENTER_Z
+    );
     sidewalk.name = 'Sidewalk';
+
     group.add(sidewalk);
 
     const curb = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.18, ROAD_LENGTH),
+      new THREE.BoxGeometry(0.16, 0.14, ROAD_LENGTH),
       curbMaterial
     );
 
-    curb.position.set(side * 5.45, 0.09, ROAD_CENTER_Z);
+    curb.position.set(
+      side * (ROAD_HALF_WIDTH + 0.08),
+      0.07,
+      ROAD_CENTER_Z
+    );
     curb.name = 'SidewalkCurb';
+
     group.add(curb);
   }
 
@@ -370,15 +503,16 @@ export function createRoad() {
     color: ROAD_STYLES.City.marking,
   });
 
-  const dashGeometry = new THREE.PlaneGeometry(0.12, 4.2);
+  const dashGeometry = new THREE.PlaneGeometry(0.1, 4.2);
 
-  for (const x of [-2, 2]) {
+  for (const x of LANE_DIVIDERS) {
     for (let i = 0; i < 34; i++) {
       const dash = new THREE.Mesh(dashGeometry, dashMaterial);
 
       dash.rotation.x = -Math.PI / 2;
       dash.position.set(x, 0.032, -i * 9 - 2);
       dash.name = 'LaneMarking';
+
       group.add(dash);
     }
   }

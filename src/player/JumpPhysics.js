@@ -11,11 +11,9 @@
 // ============================================
 
 // Jump: initial upward speed (units/s).
-export const JUMP_VELOCITY = 6.5;
-
-// Gravity while rising and while falling (units/s²).
-export const GRAVITY = 26;
-export const FALL_GRAVITY = 58;
+export const JUMP_VELOCITY = 7.2;
+export const GRAVITY = 25;
+export const FALL_GRAVITY = 55;
 
 // Slide length in seconds.
 export const SLIDE_DURATION = 0.5;

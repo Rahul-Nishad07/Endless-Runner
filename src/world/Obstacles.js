@@ -474,7 +474,7 @@ function getTailZ(items) {
  * validated for a reachable safe lane. If there are not enough free
  * slots, spawning waits for the next frame.
  */
-function fillObstacles(group, difficulty) {
+function fillObstacles(group, difficulty, actualSpeed = null) {
   const items = group.userData.items;
   const stats = group.userData.stats;
 
@@ -489,9 +489,16 @@ function fillObstacles(group, difficulty) {
       stats.starved++;
       break;
     }
+    const planningDifficulty =
+  Number.isFinite(actualSpeed) && actualSpeed > 0
+    ? {
+        ...difficulty,
+        timeGapSpeed: actualSpeed,
+      }
+    : difficulty;
 
-    const plan = planNextPattern({
-      difficulty,
+  const plan = planNextPattern({
+  difficulty: planningDifficulty,
       state: group.userData.planner,
       anchorZ,
       slotsAvailable: slots.length,
@@ -773,7 +780,7 @@ export function updateObstacles(
   // 3. SPAWN NEW PATTERN ROWS
   // ==========================================
 
-  fillObstacles(group, difficulty);
+fillObstacles(group, difficulty, speed);
 
   if (!playerData) return;
 

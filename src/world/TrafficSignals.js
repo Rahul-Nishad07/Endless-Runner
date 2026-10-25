@@ -4,12 +4,12 @@ export function createTrafficSignals() {
   const group =
     new THREE.Group();
 
-  const positions = [
-    [-6.9, -34],
-    [6.9, -92],
-    [-6.9, -150],
-    [6.9, -210],
-  ];
+ const positions = [
+  [-6.2, -34],
+  [6.2, -92],
+  [-6.2, -150],
+  [6.2, -210],
+];
 
   positions.forEach(
     ([x, z]) => {
